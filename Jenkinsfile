@@ -6,14 +6,14 @@ pipeline{
 	// agent { docker { image 'maven:3.6.3'}}
 	environment{
 		dockerHome = tool 'MyDocker'
-		// mavenHome = tool 'myMaven'
-		// PATH = "$dockerHome/bin:$mavenHome/bin:$PATH"
-		PATH = "$dockerHome/bin:$PATH"
+		mavenHome = tool 'myMaven'
+		PATH = "$dockerHome/bin:$mavenHome/bin:$PATH"
+		// PATH = "$dockerHome/bin:$PATH"
 	}
 	stages {
 		stage('Build'){
 			steps {
-				// sh 'mvn --version'
+				sh 'mvn --version'
 				sh 'docker version'
 				echo "Build"
 				echo "$PATH"
@@ -21,16 +21,43 @@ pipeline{
 				echo "Build_ID - $env.BUILD_ID"
 			}
 		}
+		stage('Compile'){
+			steps {
+				sh "mvn clean compile"
+			}
+		}		
 		stage('Test'){
 			steps {
-				echo "Test"
+				sh "mvn Test"
 			}
 		}
 		stage('Integration Test'){
 			steps {
-				echo "Integration Test"
+				sh "mvn failsafe:integration-test failsafe:verify"
 			}
 		}
+		stage('Package'){
+			steps {
+				sh "mvn package -DskipTests"
+			}
+		stage('Build Docker Image'){
+			steps {
+				script{
+					dockerImage = docker.build("tush3112/currency-exchange-devops:${env.BUILD_TAG}")
+				}
+			}
+		}
+		stage('push Docker Image'){
+			steps {
+				script{
+					docker.withRegistry('',dockerhub){
+						dockerImage.push()
+						dockerImage.push('latest');
+					}
+				}
+			}
+		}
+
 	}
 	post{
 		always{
